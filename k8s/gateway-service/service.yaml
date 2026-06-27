@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: cloudnative
+  labels:
+    app: gateway-service
+    component: consumer
+    tier: frontend
+    part-of: devops-u4-cloudnative
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-service
+  namespace: cloudnative
+  labels:
+    app: data-service
+    component: producer
+    tier: backend
+    part-of: devops-u4-cloudnative
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-service
+  template:
+    metadata:
+      labels:
+        app: data-service
+        component: producer
+        tier: backend
+        part-of: devops-u4-cloudnative
+    spec:
+      containers:
+        - name: data-service
+          # OWNER deve ser substituido pelo dono do repositorio (minusculo).
+          # O workflow troca esta imagem para a tag por SHA curto via kubectl set image.
+          image: ghcr.io/OWNER/devops-u4-cloudnative/data-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: RESPONSE_DELAY_MS
+              value: "0"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3

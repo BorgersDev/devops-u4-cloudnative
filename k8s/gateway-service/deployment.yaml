@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+  namespace: cloudnative
+  labels:
+    app: gateway-service
+    component: consumer
+    tier: frontend
+    part-of: devops-u4-cloudnative
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-service
+  template:
+    metadata:
+      labels:
+        app: gateway-service
+        component: consumer
+        tier: frontend
+        part-of: devops-u4-cloudnative
+    spec:
+      containers:
+        - name: gateway-service
+          # OWNER deve ser substituido pelo dono do repositorio (minusculo).
+          # O workflow troca esta imagem para a tag por SHA curto via kubectl set image.
+          image: ghcr.io/OWNER/devops-u4-cloudnative/gateway-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            # DNS interno do Kubernetes: <service>.<namespace>.svc.cluster.local
+            - name: DATA_SERVICE_URL
+              value: "http://data-service.cloudnative.svc.cluster.local:8000"
+            - name: DATA_SERVICE_TIMEOUT_SECONDS
+              value: "2.0"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Buffer local / stores
+*.buffer
+seen.txt
+buffer.jsonl
+
+# Segredos e configs sensiveis (NUNCA versionar)
+kubeconfig
+*.kubeconfig
+.kube/
+*.pem
+*.key
+
+# SO
+.DS_Store
