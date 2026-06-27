@@ -3,6 +3,11 @@ name: build-and-deploy
 on:
   push:
     branches: [main]
+    # Evita rebuild/redeploy quando so muda documentacao ou evidencias.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.gitignore'
   workflow_dispatch:
 
 env:
