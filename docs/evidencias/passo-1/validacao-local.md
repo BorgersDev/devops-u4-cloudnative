@@ -68,12 +68,14 @@ $ curl -s localhost:8200/
 {"data":{...,"service":"data-service"},"degraded":false, ...}
 ```
 
-## Pendente (executar no cluster)
+## Execucao no cluster (concluida)
 
-- [ ] Print/log do GitHub Actions: build + push das imagens no GHCR.
-- [ ] Print/log do GitHub Actions: deploy automatico (self-hosted runner).
-- [ ] `kubectl rollout status` dos dois Deployments.
-- [ ] Deployment usando a imagem com tag por SHA curto.
-- [ ] `kubectl get pods -n cloudnative` (Running/Ready).
-- [ ] `kubectl get svc -n cloudnative` (ClusterIP).
-- [ ] Requisicao ao gateway no cluster retornando dados do data-service.
+Todas as evidencias abaixo foram coletadas e estao em arquivos dedicados:
+
+- [x] Build + push no GHCR -> [`ci-cd-github-actions.md`](ci-cd-github-actions.md)
+- [x] Deploy automatico (self-hosted runner) -> [`ci-cd-github-actions.md`](ci-cd-github-actions.md)
+- [x] `kubectl rollout status` dos dois Deployments -> [`deploy-kubernetes.md`](deploy-kubernetes.md)
+- [x] Deployment usando a imagem com tag por SHA curto -> [`deploy-kubernetes.md`](deploy-kubernetes.md)
+- [x] `kubectl get pods -n cloudnative` (Running/Ready) -> [`deploy-kubernetes.md`](deploy-kubernetes.md)
+- [x] `kubectl get svc -n cloudnative` (ClusterIP) -> [`deploy-kubernetes.md`](deploy-kubernetes.md)
+- [x] Requisicao ao gateway no cluster com dados do data-service -> [`deploy-kubernetes.md`](deploy-kubernetes.md)

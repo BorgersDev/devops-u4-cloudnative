@@ -11,15 +11,25 @@ Execucao real do pipeline apos publicar o repositorio.
 - SHA curto implantado: `5b49761`
 - Workflow: `build-and-deploy` (push para `main`)
 
-### Status dos jobs
+### Status dos jobs (primeiro run)
 | Job                                  | Status            |
 |--------------------------------------|-------------------|
 | Build e push das imagens (GHCR)      | completed/success |
-| Deploy automatico no cluster         | queued (aguardando self-hosted runner com label `k8s`) |
+| Deploy automatico no cluster         | queued (sem runner ainda) |
 
-> O job de deploy permanece `queued` ate o self-hosted runner conectado ao
-> cluster ser registrado. Esse e o comportamento esperado: runners hospedados
-> pelo GitHub nao alcancam o Minikube/K3s local.
+> Esse primeiro run validou build+push. O job de deploy ficou `queued` ate o
+> self-hosted runner ser registrado, e as imagens iniciais eram amd64-only.
+
+### Run final (deploy verde)
+- Run: https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28300121768
+- Commit/tag: `faee6e7` (imagens **multi-arch** amd64+arm64)
+
+| Job                                  | Status            |
+|--------------------------------------|-------------------|
+| Build e push das imagens (GHCR)      | completed/success |
+| Deploy automatico no cluster         | completed/success |
+
+Detalhes do deploy no cluster em [`deploy-kubernetes.md`](deploy-kubernetes.md).
 
 ## Imagens publicadas no GHCR (publicas)
 

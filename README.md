@@ -4,13 +4,12 @@ Arquitetura cloud-native com dois microsservicos Flask, conteinerizacao,
 Kubernetes, CI/CD, observabilidade, tracing distribuido e simulacao de edge
 computing. Entrega da atividade U4.
 
-> Estado atual: **Passo 1 - codigo completo e validado localmente** (dois
-> microsservicos, Dockerfiles, manifestos Kubernetes e workflow de CI/CD). Falta
-> a evidencia de execucao real no cluster: pipeline verde no GitHub Actions,
-> imagens no GHCR, pods `Running/Ready`, `kubectl rollout status` e deploy pela
-> tag por SHA curto. Essas evidencias dependem de publicar o repo e registrar o
-> self-hosted runner (ver secao CI/CD). Passos 2 (observabilidade/tracing) e 3
-> (edge) sao incrementos sobre esta base.
+> Estado atual: **Passo 1 concluido e comprovado de ponta a ponta**. Pipeline
+> verde no GitHub Actions (build multi-arch + push no GHCR), deploy automatico no
+> Minikube (Calico) via self-hosted runner, pods `Running/Ready`, Services
+> `ClusterIP`, Deployment usando a tag por SHA curto e chamada real ao gateway
+> retornando dados do data-service. Evidencias em `docs/evidencias/passo-1/`.
+> Passos 2 (observabilidade/tracing) e 3 (edge) sao incrementos sobre esta base.
 
 ## Arquitetura
 
