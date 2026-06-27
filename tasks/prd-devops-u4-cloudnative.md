@@ -3,6 +3,17 @@
 > Repositorio alvo: `devops-u4-cloudnative`
 > Atividade U4: conteinerizacao avancada, Kubernetes, CI/CD, observabilidade, tracing distribuido e simulacao de edge computing.
 
+## Status De Execucao
+
+- **Passo 1 (Microsservicos, Containers, Kubernetes e CI/CD): CONCLUIDO e comprovado de ponta a ponta.**
+  - Repo publico: https://github.com/BorgersDev/devops-u4-cloudnative
+  - Pipeline `build-and-deploy` verde (build multi-arch + push GHCR + deploy automatico).
+  - Cluster Minikube com Calico; deploy pelo self-hosted runner (label `k8s`).
+  - Pods `Running/Ready`, Services `ClusterIP`, Deployments na tag por SHA curto, gateway respondendo com dados do data-service.
+  - Evidencias em `docs/evidencias/passo-1/` (`ci-cd-github-actions.md`, `deploy-kubernetes.md`, `validacao-local.md`).
+- **Passo 2 (Observabilidade e Tracing): PENDENTE.**
+- **Passo 3 (Edge Computing): PENDENTE.**
+
 ## 1. Introducao / Visao Geral
 
 Esta atividade constroi um cenario cloud-native integrado de ponta a ponta. O projeto deve conter dois microsservicos Flask conteinerizados, deployados em Kubernetes, publicados por pipeline de CI/CD no GitHub Actions, observados com Prometheus e Jaeger/OpenTelemetry e adaptados para uma simulacao de execucao em borda com conectividade instavel.
@@ -123,18 +134,18 @@ Criar dois microsservicos, empacotar cada um em uma imagem Docker, publicar as i
 
 #### Criterios De Aceite
 
-- [ ] `data-service` responde `GET /data` com JSON valido.
-- [ ] `data-service` permite simular latencia controlada para testar timeout e modo degradado.
-- [ ] `gateway-service` chama o `data-service` usando a variavel `DATA_SERVICE_URL`.
-- [ ] `gateway-service` usa `DATA_SERVICE_TIMEOUT_SECONDS` para evitar travar em chamadas lentas.
-- [ ] Ambos os servicos possuem `GET /health/live` e `GET /health/ready`.
-- [ ] Ambos os servicos possuem Dockerfile baseado em imagem leve, como `python:3.12-slim`.
-- [ ] As imagens sao publicadas no `ghcr.io/<owner>/devops-u4-cloudnative/<service>:<tag>`.
-- [ ] Os Deployments possuem `requests`, `limits`, labels e selectors coerentes.
-- [ ] Os Services sao `ClusterIP`.
-- [ ] O pipeline `deploy.yml` executa build, push e deploy automatico no cluster.
-- [ ] O pipeline atualiza as imagens dos Deployments com a tag do commit e valida `kubectl rollout status`.
-- [ ] O README explica a estrategia usada para o deploy automatico no cluster escolhido.
+- [x] `data-service` responde `GET /data` com JSON valido.
+- [x] `data-service` permite simular latencia controlada para testar timeout e modo degradado.
+- [x] `gateway-service` chama o `data-service` usando a variavel `DATA_SERVICE_URL`.
+- [x] `gateway-service` usa `DATA_SERVICE_TIMEOUT_SECONDS` para evitar travar em chamadas lentas.
+- [x] Ambos os servicos possuem `GET /health/live` e `GET /health/ready`.
+- [x] Ambos os servicos possuem Dockerfile baseado em imagem leve, como `python:3.12-slim`.
+- [x] As imagens sao publicadas no `ghcr.io/<owner>/devops-u4-cloudnative/<service>:<tag>`.
+- [x] Os Deployments possuem `requests`, `limits`, labels e selectors coerentes.
+- [x] Os Services sao `ClusterIP`.
+- [x] O pipeline `deploy.yml` executa build, push e deploy automatico no cluster.
+- [x] O pipeline atualiza as imagens dos Deployments com a tag do commit e valida `kubectl rollout status`.
+- [x] O README explica a estrategia usada para o deploy automatico no cluster escolhido.
 
 #### Evidencias Esperadas
 
@@ -252,14 +263,14 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `services/data-service/app.py` contem app Flask funcional.
-- [ ] `GET /data` retorna JSON valido.
-- [ ] `GET /data` permite simular latencia controlada por `delay_ms` ou `RESPONSE_DELAY_MS` para testar timeout do gateway.
-- [ ] `POST /sync` recebe uma lista de eventos no formato `{event_id, timestamp, path, payload}` e responde com o resumo de aceitos e ignorados.
-- [ ] `POST /sync` mantem o conjunto de `event_id` ja recebidos (em memoria ou arquivo) e ignora repetidos, garantindo idempotencia.
-- [ ] `GET /health/live` retorna status vivo.
-- [ ] `GET /health/ready` retorna status pronto.
-- [ ] `requirements.txt` fixa dependencias necessarias.
+- [x] `services/data-service/app.py` contem app Flask funcional.
+- [x] `GET /data` retorna JSON valido.
+- [x] `GET /data` permite simular latencia controlada por `delay_ms` ou `RESPONSE_DELAY_MS` para testar timeout do gateway.
+- [x] `POST /sync` recebe uma lista de eventos no formato `{event_id, timestamp, path, payload}` e responde com o resumo de aceitos e ignorados.
+- [x] `POST /sync` mantem o conjunto de `event_id` ja recebidos (em memoria ou arquivo) e ignora repetidos, garantindo idempotencia.
+- [x] `GET /health/live` retorna status vivo.
+- [x] `GET /health/ready` retorna status pronto.
+- [x] `requirements.txt` fixa dependencias necessarias.
 
 ### US-002: Criar O Microsservico Consumidor
 
@@ -267,12 +278,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `services/gateway-service/app.py` contem app Flask funcional.
-- [ ] `GET /` chama o `data-service` via `DATA_SERVICE_URL`.
-- [ ] `GET /` usa timeout configuravel via `DATA_SERVICE_TIMEOUT_SECONDS`.
-- [ ] A resposta e exibida como JSON enriquecido ou HTML simples.
-- [ ] Falhas de conexao, bloqueio por policy ou latencia acima do timeout geram resposta degradada controlada.
-- [ ] `GET /health/live` e `GET /health/ready` estao disponiveis.
+- [x] `services/gateway-service/app.py` contem app Flask funcional.
+- [x] `GET /` chama o `data-service` via `DATA_SERVICE_URL`.
+- [x] `GET /` usa timeout configuravel via `DATA_SERVICE_TIMEOUT_SECONDS`.
+- [x] A resposta e exibida como JSON enriquecido ou HTML simples.
+- [x] Falhas de conexao, bloqueio por policy ou latencia acima do timeout geram resposta degradada controlada.
+- [x] `GET /health/live` e `GET /health/ready` estao disponiveis.
 
 ### US-003: Conteinerizar Os Servicos
 
@@ -280,12 +291,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] Cada servico possui `Dockerfile` proprio.
-- [ ] Cada servico possui `.dockerignore`.
-- [ ] As imagens usam base leve, como `python:3.12-slim`.
-- [ ] Os containers rodam com servidor adequado para container, como `gunicorn`.
-- [ ] O `gunicorn` roda com `--workers 1` na entrega, para manter o registro do `prometheus_client` consistente entre scrapes. Se mais de um worker for necessario, o modo multiprocess do `prometheus_client` deve ser configurado via `PROMETHEUS_MULTIPROC_DIR`.
-- [ ] `docker build` e `docker run` funcionam para os dois servicos.
+- [x] Cada servico possui `Dockerfile` proprio.
+- [x] Cada servico possui `.dockerignore`.
+- [x] As imagens usam base leve, como `python:3.12-slim`.
+- [x] Os containers rodam com servidor adequado para container, como `gunicorn`.
+- [x] O `gunicorn` roda com `--workers 1` na entrega, para manter o registro do `prometheus_client` consistente entre scrapes. Se mais de um worker for necessario, o modo multiprocess do `prometheus_client` deve ser configurado via `PROMETHEUS_MULTIPROC_DIR`.
+- [x] `docker build` e `docker run` funcionam para os dois servicos.
 
 ### US-004: Orquestrar No Kubernetes
 
@@ -293,12 +304,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `k8s/data-service/deployment.yaml` e `service.yaml` existem.
-- [ ] `k8s/gateway-service/deployment.yaml` e `service.yaml` existem.
-- [ ] Deployments usam `resources.requests` e `resources.limits`.
-- [ ] Labels e selectors sao consistentes.
-- [ ] Services sao `ClusterIP`.
-- [ ] O gateway resolve o produtor por DNS interno do Kubernetes.
+- [x] `k8s/data-service/deployment.yaml` e `service.yaml` existem.
+- [x] `k8s/gateway-service/deployment.yaml` e `service.yaml` existem.
+- [x] Deployments usam `resources.requests` e `resources.limits`.
+- [x] Labels e selectors sao consistentes.
+- [x] Services sao `ClusterIP`.
+- [x] O gateway resolve o produtor por DNS interno do Kubernetes.
 
 ### US-005: Automatizar Build, Push E Deploy
 
@@ -306,13 +317,13 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `.github/workflows/deploy.yml` dispara em push para `main`.
-- [ ] Workflow builda as duas imagens.
-- [ ] Workflow publica as imagens no GHCR com tag por SHA curto e `latest`.
-- [ ] Workflow usa self-hosted runner ou cluster acessivel para aplicar os manifestos com `kubectl apply`.
-- [ ] Workflow atualiza as imagens implantadas com a tag por SHA curto usando `kubectl set image` ou Kustomize.
-- [ ] Workflow executa `kubectl rollout status` para os dois Deployments.
-- [ ] README documenta a estrategia de acesso ao cluster usada pelo pipeline.
+- [x] `.github/workflows/deploy.yml` dispara em push para `main`.
+- [x] Workflow builda as duas imagens.
+- [x] Workflow publica as imagens no GHCR com tag por SHA curto e `latest`.
+- [x] Workflow usa self-hosted runner ou cluster acessivel para aplicar os manifestos com `kubectl apply`.
+- [x] Workflow atualiza as imagens implantadas com a tag por SHA curto usando `kubectl set image` ou Kustomize.
+- [x] Workflow executa `kubectl rollout status` para os dois Deployments.
+- [x] README documenta a estrategia de acesso ao cluster usada pelo pipeline.
 
 ### US-006: Expor Metricas Prometheus
 
@@ -525,11 +536,11 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 
 ## 10. Definition Of Done
 
-- [ ] Repositorio `devops-u4-cloudnative` criado e versionado no GitHub.
-- [ ] Dois microsservicos executam localmente.
-- [ ] Duas imagens sao publicadas no GHCR.
-- [ ] Manifestos Kubernetes sobem a aplicacao no cluster.
-- [ ] Pipeline do GitHub Actions executa build, push, deploy automatico, update de imagem por SHA curto e `rollout status`.
+- [x] Repositorio `devops-u4-cloudnative` criado e versionado no GitHub.
+- [x] Dois microsservicos executam localmente.
+- [x] Duas imagens sao publicadas no GHCR.
+- [x] Manifestos Kubernetes sobem a aplicacao no cluster.
+- [x] Pipeline do GitHub Actions executa build, push, deploy automatico, update de imagem por SHA curto e `rollout status`.
 - [ ] Prometheus coleta metricas dos dois servicos.
 - [ ] Jaeger mostra trace distribuido com spans dos dois servicos.
 - [ ] Sidecar OpenTelemetry Collector ou agent equivalente aparece nos pods da aplicacao.
@@ -537,9 +548,9 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 - [ ] Gateway de borda opera em modo degradado com buffer local.
 - [ ] Script de sincronizacao envia dados ao central apos reconexao.
 - [ ] Simulacao de latencia e simulacao de desconexao foram demonstradas separadamente.
-- [ ] `docs/etica-e-principios.md` conecta decisoes tecnicas a responsabilidade, colaboracao, bem comum, seguranca e transparencia.
-- [ ] Evidencias dos tres passos estao salvas em `docs/evidencias/`.
-- [ ] README descreve como reproduzir a entrega.
+- [x] `docs/etica-e-principios.md` conecta decisoes tecnicas a responsabilidade, colaboracao, bem comum, seguranca e transparencia.
+- [ ] Evidencias dos tres passos estao salvas em `docs/evidencias/` (Passo 1 concluido; Passos 2 e 3 pendentes).
+- [x] README descreve como reproduzir a entrega.
 
 ## 11. Success Metrics
 
@@ -568,12 +579,12 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 
 ### Passo 1
 
-- [ ] Codigo dos dois microsservicos.
-- [ ] Dockerfiles e `.dockerignore`.
-- [ ] Imagens publicadas no registry.
-- [ ] Deployments e Services Kubernetes.
-- [ ] Workflow `deploy.yml` com build, push, deploy automatico, update de imagem por SHA curto e `rollout status`.
-- [ ] Evidencias de pipeline, pods, services e chamada ao gateway.
+- [x] Codigo dos dois microsservicos.
+- [x] Dockerfiles e `.dockerignore`.
+- [x] Imagens publicadas no registry.
+- [x] Deployments e Services Kubernetes.
+- [x] Workflow `deploy.yml` com build, push, deploy automatico, update de imagem por SHA curto e `rollout status`.
+- [x] Evidencias de pipeline, pods, services e chamada ao gateway.
 
 ### Passo 2
 
@@ -598,8 +609,8 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 
 ### Etica E Organizacao
 
-- [ ] README reproduzivel.
-- [ ] `docs/decisoes-tecnicas.md`.
-- [ ] `docs/etica-e-principios.md`.
-- [ ] Evidencias organizadas por passo.
-- [ ] Nenhum secret, token ou kubeconfig versionado.
+- [x] README reproduzivel.
+- [x] `docs/decisoes-tecnicas.md`.
+- [x] `docs/etica-e-principios.md`.
+- [~] Evidencias organizadas por passo (Passo 1 concluido; Passos 2 e 3 pendentes).
+- [x] Nenhum secret, token ou kubeconfig versionado.
