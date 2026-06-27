@@ -11,7 +11,13 @@
   - Cluster Minikube com Calico; deploy pelo self-hosted runner (label `k8s`).
   - Pods `Running/Ready`, Services `ClusterIP`, Deployments na tag por SHA curto, gateway respondendo com dados do data-service.
   - Evidencias em `docs/evidencias/passo-1/` (`ci-cd-github-actions.md`, `deploy-kubernetes.md`, `validacao-local.md`).
-- **Passo 2 (Observabilidade e Tracing): PENDENTE.**
+- **Passo 2 (Observabilidade e Tracing): CONCLUIDO e comprovado de ponta a ponta.**
+  - `/metrics` nos dois servicos (`http_requests_total`, `http_request_duration_seconds`, `process_cpu_seconds_total`).
+  - Prometheus no cluster descobrindo pods por annotations; os dois targets `UP`.
+  - OpenTelemetry (Flask + requests) com setup no `post_fork` do gunicorn; sidecar `otel-collector` por pod.
+  - Jaeger all-in-one (OTLP) exibindo trace multi-servico `gateway-service` -> `data-service`.
+  - Deploy da app pelo pipeline (run `28301660010`, tag por SHA curto `9bbd924`), pods `2/2` (app + sidecar).
+  - Evidencias em `docs/evidencias/passo-2/` (`prometheus-observabilidade.md`, `tracing-jaeger.md`, `sidecar-e-deploy.md`).
 - **Passo 3 (Edge Computing): PENDENTE.**
 
 ## 1. Introducao / Visao Geral
@@ -187,13 +193,13 @@ Adicionar metricas e tracing distribuido aos microsservicos para acompanhar requ
 
 #### Criterios De Aceite
 
-- [ ] Ambos os servicos expoem `GET /metrics` no formato Prometheus.
-- [ ] Prometheus mostra targets dos dois servicos como `UP`.
-- [ ] Prometheus exibe contador de requisicoes, histograma de latencia e metrica de CPU.
-- [ ] Os pods possuem sidecar de OpenTelemetry Collector ou agent equivalente.
-- [ ] `gateway-service` e `data-service` usam nomes de servico distintos em `OTEL_SERVICE_NAME`.
-- [ ] Uma chamada ao gateway gera um trace unico com spans dos dois servicos.
-- [ ] Jaeger UI mostra tempo por etapa e relacionamento entre os spans.
+- [x] Ambos os servicos expoem `GET /metrics` no formato Prometheus.
+- [x] Prometheus mostra targets dos dois servicos como `UP`.
+- [x] Prometheus exibe contador de requisicoes, histograma de latencia e metrica de CPU.
+- [x] Os pods possuem sidecar de OpenTelemetry Collector ou agent equivalente.
+- [x] `gateway-service` e `data-service` usam nomes de servico distintos em `OTEL_SERVICE_NAME`.
+- [x] Uma chamada ao gateway gera um trace unico com spans dos dois servicos.
+- [x] Jaeger UI mostra tempo por etapa e relacionamento entre os spans.
 
 #### Evidencias Esperadas
 
@@ -331,11 +337,11 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] Ambos os servicos expoem `GET /metrics`.
-- [ ] Existe contador `http_requests_total` ou equivalente.
-- [ ] Existe histograma `http_request_duration_seconds` ou equivalente.
-- [ ] Existe metrica de CPU do processo ou do container disponivel para evidencia.
-- [ ] Pods possuem annotations de scrape do Prometheus.
+- [x] Ambos os servicos expoem `GET /metrics`.
+- [x] Existe contador `http_requests_total` ou equivalente.
+- [x] Existe histograma `http_request_duration_seconds` ou equivalente.
+- [x] Existe metrica de CPU do processo ou do container disponivel para evidencia.
+- [x] Pods possuem annotations de scrape do Prometheus.
 
 ### US-007: Instalar Prometheus No Cluster
 
@@ -343,10 +349,10 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `k8s/observability/prometheus.yaml` existe ou o uso de Helm esta documentado.
-- [ ] Prometheus descobre pods por annotations.
-- [ ] UI do Prometheus e acessivel via `kubectl port-forward`.
-- [ ] Targets dos dois microsservicos aparecem como `UP`.
+- [x] `k8s/observability/prometheus.yaml` existe ou o uso de Helm esta documentado.
+- [x] Prometheus descobre pods por annotations.
+- [x] UI do Prometheus e acessivel via `kubectl port-forward`.
+- [x] Targets dos dois microsservicos aparecem como `UP`.
 
 ### US-008: Instrumentar Tracing Com OpenTelemetry
 
@@ -354,12 +360,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] OpenTelemetry SDK esta configurado nos dois servicos.
-- [ ] Flask e requests estao instrumentados.
-- [ ] Contexto de trace e propagado via `traceparent`.
-- [ ] `OTEL_SERVICE_NAME` diferencia `gateway-service` e `data-service`.
-- [ ] Apps exportam spans para o sidecar OpenTelemetry Collector.
-- [ ] O manifesto de cada app demonstra o padrao sidecar com container da aplicacao e container `otel-collector` no mesmo pod.
+- [x] OpenTelemetry SDK esta configurado nos dois servicos.
+- [x] Flask e requests estao instrumentados.
+- [x] Contexto de trace e propagado via `traceparent`.
+- [x] `OTEL_SERVICE_NAME` diferencia `gateway-service` e `data-service`.
+- [x] Apps exportam spans para o sidecar OpenTelemetry Collector.
+- [x] O manifesto de cada app demonstra o padrao sidecar com container da aplicacao e container `otel-collector` no mesmo pod.
 
 ### US-009: Instalar Jaeger E Visualizar Trace Completo
 
@@ -367,10 +373,10 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `k8s/observability/jaeger.yaml` existe ou o uso de Helm esta documentado.
-- [ ] Jaeger recebe spans via OTLP.
-- [ ] UI do Jaeger e acessivel via `kubectl port-forward`.
-- [ ] Uma requisicao ao gateway gera trace com spans de ambos os servicos.
+- [x] `k8s/observability/jaeger.yaml` existe ou o uso de Helm esta documentado.
+- [x] Jaeger recebe spans via OTLP.
+- [x] UI do Jaeger e acessivel via `kubectl port-forward`.
+- [x] Uma requisicao ao gateway gera trace com spans de ambos os servicos.
 
 ### US-010: Simular Ambiente De Borda
 
@@ -439,7 +445,7 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 - [ ] `docs/decisoes-tecnicas.md` descreve escolhas e trade-offs.
 - [ ] `docs/etica-e-principios.md` descreve responsabilidade, colaboracao, bem comum, seguranca de secrets, uso consciente de recursos e transparencia das evidencias.
 - [ ] `docs/evidencias/passo-1/` contem evidencias de build, deploy e execucao.
-- [ ] `docs/evidencias/passo-2/` contem evidencias de Prometheus e Jaeger.
+- [x] `docs/evidencias/passo-2/` contem evidencias de Prometheus e Jaeger.
 - [ ] `docs/evidencias/passo-3/` contem evidencias de offline, probes, buffer e sync.
 
 ## 6. Functional Requirements
@@ -541,15 +547,15 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 - [x] Duas imagens sao publicadas no GHCR.
 - [x] Manifestos Kubernetes sobem a aplicacao no cluster.
 - [x] Pipeline do GitHub Actions executa build, push, deploy automatico, update de imagem por SHA curto e `rollout status`.
-- [ ] Prometheus coleta metricas dos dois servicos.
-- [ ] Jaeger mostra trace distribuido com spans dos dois servicos.
-- [ ] Sidecar OpenTelemetry Collector ou agent equivalente aparece nos pods da aplicacao.
+- [x] Prometheus coleta metricas dos dois servicos.
+- [x] Jaeger mostra trace distribuido com spans dos dois servicos.
+- [x] Sidecar OpenTelemetry Collector ou agent equivalente aparece nos pods da aplicacao.
 - [ ] Namespace `edge` simula conectividade restrita.
 - [ ] Gateway de borda opera em modo degradado com buffer local.
 - [ ] Script de sincronizacao envia dados ao central apos reconexao.
 - [ ] Simulacao de latencia e simulacao de desconexao foram demonstradas separadamente.
 - [x] `docs/etica-e-principios.md` conecta decisoes tecnicas a responsabilidade, colaboracao, bem comum, seguranca e transparencia.
-- [ ] Evidencias dos tres passos estao salvas em `docs/evidencias/` (Passo 1 concluido; Passos 2 e 3 pendentes).
+- [ ] Evidencias dos tres passos estao salvas em `docs/evidencias/` (Passos 1 e 2 concluidos; Passo 3 pendente).
 - [x] README descreve como reproduzir a entrega.
 
 ## 11. Success Metrics
@@ -588,12 +594,12 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 
 ### Passo 2
 
-- [ ] Endpoints `/metrics`.
-- [ ] Prometheus instalado e coletando targets.
-- [ ] OpenTelemetry nos servicos.
-- [ ] Sidecar ou agent de exportacao nos pods.
-- [ ] Jaeger instalado e recebendo spans.
-- [ ] Evidencias de metricas de requisicoes, latencia, CPU e trace completo.
+- [x] Endpoints `/metrics`.
+- [x] Prometheus instalado e coletando targets.
+- [x] OpenTelemetry nos servicos.
+- [x] Sidecar ou agent de exportacao nos pods.
+- [x] Jaeger instalado e recebendo spans.
+- [x] Evidencias de metricas de requisicoes, latencia, CPU e trace completo.
 
 ### Passo 3
 
@@ -612,5 +618,5 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 - [x] README reproduzivel.
 - [x] `docs/decisoes-tecnicas.md`.
 - [x] `docs/etica-e-principios.md`.
-- [~] Evidencias organizadas por passo (Passo 1 concluido; Passos 2 e 3 pendentes).
+- [~] Evidencias organizadas por passo (Passos 1 e 2 concluidos; Passo 3 pendente).
 - [x] Nenhum secret, token ou kubeconfig versionado.

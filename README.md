@@ -4,12 +4,15 @@ Arquitetura cloud-native com dois microsservicos Flask, conteinerizacao,
 Kubernetes, CI/CD, observabilidade, tracing distribuido e simulacao de edge
 computing. Entrega da atividade U4.
 
-> Estado atual: **Passo 1 concluido e comprovado de ponta a ponta**. Pipeline
-> verde no GitHub Actions (build multi-arch + push no GHCR), deploy automatico no
+> Estado atual: **Passos 1 e 2 concluidos e comprovados de ponta a ponta**.
+> Passo 1: pipeline verde (build multi-arch + push no GHCR), deploy automatico no
 > Minikube (Calico) via self-hosted runner, pods `Running/Ready`, Services
-> `ClusterIP`, Deployment usando a tag por SHA curto e chamada real ao gateway
-> retornando dados do data-service. Evidencias em `docs/evidencias/passo-1/`.
-> Passos 2 (observabilidade/tracing) e 3 (edge) sao incrementos sobre esta base.
+> `ClusterIP`, Deployment usando a tag por SHA curto e chamada real ao gateway.
+> Passo 2: `/metrics` nos dois servicos, Prometheus coletando por annotations com
+> os dois targets `UP`, OpenTelemetry com sidecar `otel-collector` por pod e
+> Jaeger exibindo trace multi-servico (`gateway-service` -> `data-service`).
+> Evidencias em `docs/evidencias/passo-1/` e `docs/evidencias/passo-2/`.
+> O Passo 3 (edge) e um incremento sobre esta base.
 
 ## Arquitetura
 
@@ -26,9 +29,9 @@ usuario --> gateway-service (GET /) --HTTP--> data-service (GET /data)
 ## Estrutura do repositorio
 
 ```text
-services/        codigo e Dockerfile de cada microsservico
-k8s/             manifestos Kubernetes (namespace, deployments, services)
-scripts/         scripts de apoio (trafego, offline, sync) - Passos 2 e 3
+services/        codigo, Dockerfile e gunicorn.conf.py de cada microsservico
+k8s/             manifestos Kubernetes (namespace, deployments, services, observability)
+scripts/         scripts de apoio (deploy local, generate-traffic; offline/sync no Passo 3)
 docs/            decisoes tecnicas, etica e evidencias por passo
 .github/workflows/deploy.yml   pipeline build + push + deploy
 ```
@@ -40,6 +43,7 @@ docs/            decisoes tecnicas, etica e evidencias por passo
 |--------|-----------------|------------------------------------------------------------|
 | GET    | `/data`         | Dados simulados. Latencia opcional via `?delay_ms=<n>` ou env `RESPONSE_DELAY_MS`. |
 | POST   | `/sync`         | Recebe lista de eventos `{event_id, timestamp, path, payload}`; deduplica por `event_id`. |
+| GET    | `/metrics`      | Metricas Prometheus (`http_requests_total`, `http_request_duration_seconds`, CPU). |
 | GET    | `/health/live`  | Liveness.                                                  |
 | GET    | `/health/ready` | Readiness.                                                 |
 
@@ -47,6 +51,7 @@ docs/            decisoes tecnicas, etica e evidencias por passo
 | Metodo | Rota            | Descricao                                                  |
 |--------|-----------------|------------------------------------------------------------|
 | GET    | `/`             | Chama `DATA_SERVICE_URL` e formata a resposta. Modo degradado em falha/timeout. |
+| GET    | `/metrics`      | Metricas Prometheus (`http_requests_total`, `http_request_duration_seconds`, CPU). |
 | GET    | `/health/live`  | Liveness.                                                  |
 | GET    | `/health/ready` | Readiness (nao depende do central).                        |
 
@@ -57,6 +62,8 @@ docs/            decisoes tecnicas, etica e evidencias por passo
 | data-service    | `SYNC_STORE_PATH`               | (vazio)                 | Arquivo para persistir `event_id`.   |
 | gateway-service | `DATA_SERVICE_URL`              | `http://localhost:8000` | URL do produtor.                     |
 | gateway-service | `DATA_SERVICE_TIMEOUT_SECONDS`  | `2.0`                   | Timeout da chamada ao produtor.      |
+| ambos           | `OTEL_SERVICE_NAME`             | nome do servico         | `service.name` no tracing (Jaeger).  |
+| ambos           | `OTEL_EXPORTER_OTLP_ENDPOINT`   | `http://localhost:4317` | Sidecar otel-collector (OTLP/gRPC).  |
 
 ## Execucao local
 
@@ -133,6 +140,37 @@ kubectl -n cloudnative port-forward svc/gateway-service 8100:8000
 curl localhost:8100/
 ```
 
+## Observabilidade (Passo 2)
+
+Metricas com Prometheus e tracing distribuido com OpenTelemetry + Jaeger. Cada pod
+da aplicacao roda dois containers: o app e um **sidecar `otel-collector`** que
+recebe spans em `localhost:4317` e os encaminha ao Jaeger.
+
+Instalar o stack de observabilidade (uma vez; e infra, nao a aplicacao):
+```bash
+kubectl apply -f k8s/observability/otel-collector-config.yaml   # config do sidecar
+kubectl apply -f k8s/observability/prometheus.yaml
+kubectl apply -f k8s/observability/jaeger.yaml
+kubectl -n cloudnative rollout status deployment/prometheus
+kubectl -n cloudnative rollout status deployment/jaeger
+```
+> O ConfigMap `otel-collector-config` tambem e aplicado pelo pipeline antes dos
+> Deployments, pois o sidecar o monta como volume e precisa dele para subir.
+
+Gerar trafego e abrir as UIs:
+```bash
+kubectl -n cloudnative port-forward svc/gateway-service 8100:8000 &
+kubectl -n cloudnative port-forward svc/prometheus 9090:9090 &
+kubectl -n cloudnative port-forward svc/jaeger 16686:16686 &
+
+./scripts/generate-traffic.sh http://localhost:8100/ 60
+
+# Prometheus: http://localhost:9090/targets  (data-service e gateway-service UP)
+#   PromQL: http_requests_total / http_request_duration_seconds_count / process_cpu_seconds_total
+# Jaeger:   http://localhost:16686  (Service gateway-service, operacao GET /)
+#   trace com spans de gateway-service e data-service
+```
+
 ## CI/CD: estrategia de deploy automatico
 
 `.github/workflows/deploy.yml` dispara em push para `main` e tem dois jobs:
@@ -167,6 +205,7 @@ Imagens **publicas** no GHCR evitam `imagePullSecret`. Se forem privadas, crie u
 - [`docs/decisoes-tecnicas.md`](docs/decisoes-tecnicas.md) - escolhas e trade-offs.
 - [`docs/etica-e-principios.md`](docs/etica-e-principios.md) - etica aplicada.
 - `docs/evidencias/passo-1/` - evidencias de build, deploy e execucao.
+- `docs/evidencias/passo-2/` - evidencias de metricas (Prometheus), tracing (Jaeger) e sidecar.
 
 ## Seguranca
 

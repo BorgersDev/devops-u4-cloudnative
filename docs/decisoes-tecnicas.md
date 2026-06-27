@@ -67,9 +67,63 @@ Passo 3 (buffer local). O timeout e configuravel por `DATA_SERVICE_TIMEOUT_SECON
 - `docker build` e `docker run` funcionam para os dois servicos; o gateway em
   container alcanca o data-service pela rede Docker.
 
-## Passo 2 (planejado)
-Metricas Prometheus (`/metrics`, contador, histograma), annotations de scrape,
-OpenTelemetry SDK, sidecar OTel Collector e Jaeger.
+## Passo 2: Observabilidade com Prometheus e Tracing com Jaeger
+
+### Metricas (prometheus_client)
+- **`/metrics`** nos dois servicos via `prometheus_client`, exposto no formato
+  texto do Prometheus.
+- **Contador `http_requests_total`** e **histograma
+  `http_request_duration_seconds`** rotulados por `service`, `method`, `endpoint`
+  (e `http_status` no contador), preenchidos por hooks `before_request`/
+  `after_request`. O proprio `/metrics` e excluido para nao se auto-contar.
+- **CPU**: `process_cpu_seconds_total` vem de graca do `ProcessCollector` padrao
+  do `prometheus_client`, atendendo a evidencia de CPU sem componentes extras.
+- O motivo de `gunicorn --workers 1` (ja fixado no Passo 1) se concretiza aqui:
+  um unico registro do `prometheus_client`, sem valores divergentes entre scrapes.
+
+### Coleta (Prometheus por annotations)
+- **Annotations `prometheus.io/scrape|path|port`** nos pods da app. O Prometheus
+  usa `kubernetes_sd_configs` (role `pod`, restrito ao namespace `cloudnative`) e
+  `relabel_configs` para descobrir e raspar so os pods anotados, na porta 8000.
+- **Sem Prometheus Operator**: usamos annotations + `kubernetes_sd_configs` em vez
+  de `ServiceMonitor`, conforme a Technical Consideration do PRD. RBAC e somente
+  leitura (`get/list/watch` de pods/services/endpoints/nodes).
+- O Prometheus e instalado **a parte** (`k8s/observability/prometheus.yaml`), pois
+  e infra de observabilidade, nao a aplicacao. O deploy da app permanece no
+  pipeline. Armazenamento `emptyDir` (laboratorio).
+
+### Tracing (OpenTelemetry + sidecar + Jaeger)
+- **OpenTelemetry SDK** nos dois servicos: `FlaskInstrumentor` em ambos e
+  `RequestsInstrumentor` no gateway, que propaga o contexto W3C `traceparent` ao
+  data-service, gerando um **trace unico multi-servico**.
+- **Inicializacao no `post_fork` do gunicorn** (`gunicorn.conf.py`): o
+  `BatchSpanProcessor` sobe uma thread exportadora que **nao sobrevive ao fork**;
+  inicializar no master perderia spans. Com `--workers 1`, um unico provider no
+  worker. Validado pelos logs do sidecar mostrando spans chegando.
+- **`OTEL_SERVICE_NAME`** distinto (`data-service` / `gateway-service`) separa os
+  servicos no Jaeger. Export OTLP/gRPC para `http://localhost:4317` (o `http://`
+  sinaliza canal inseguro, sem TLS).
+- **Padrao sidecar (FR-15)**: cada pod da app tem o container do app **e** um
+  `otel-collector` (imagem contrib oficial, multi-arch). O collector recebe OTLP
+  em `localhost:4317/4318` e encaminha ao Service do Jaeger. A config do collector
+  e um ConfigMap compartilhado, **aplicado pelo pipeline** antes dos Deployments
+  (e montado como volume), para que o sidecar suba junto com a app.
+- **Jaeger all-in-one** (`k8s/observability/jaeger.yaml`) com `COLLECTOR_OTLP_ENABLED=true`,
+  expondo UI (16686) e OTLP (4317/4318). Armazenamento em memoria (laboratorio).
+
+### setuptools fixado < 81
+`opentelemetry-instrumentation` 0.48b0 ainda importa `pkg_resources`, removido no
+`setuptools >= 81`. Sem o pin, o worker do gunicorn falhava ao bootar
+(`ModuleNotFoundError: No module named 'pkg_resources'`). Fixamos `setuptools==80.9.0`.
+
+### Validacoes executadas no Passo 2
+- Build local das duas imagens com as novas dependencias; `/data`, `/metrics` e
+  modo degradado confirmados antes do push.
+- Pipeline verde (build multi-arch + deploy automatico), pods `2/2` (app +
+  sidecar) na tag por SHA curto `9bbd924`.
+- Prometheus com os dois targets `UP`; tres consultas PromQL com dados
+  (`http_requests_total`, `http_request_duration_seconds`, `process_cpu_seconds_total`).
+- Jaeger com trace multi-servico (`gateway-service GET /` -> `data-service GET /data`).
 
 ## Passo 3 (planejado)
 Namespace `edge`, `NetworkPolicy` com CNI que aplica policy, simulacao de
