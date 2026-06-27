@@ -21,8 +21,8 @@ Execucao real do pipeline apos publicar o repositorio.
 > self-hosted runner ser registrado, e as imagens iniciais eram amd64-only.
 
 ### Run final (deploy verde)
-- Run: https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28300121768
-- Commit/tag: `faee6e7` (imagens **multi-arch** amd64+arm64)
+- Run: https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28300267604
+- Commit/tag: `a281c7e` (imagens **multi-arch** amd64+arm64)
 
 | Job                                  | Status            |
 |--------------------------------------|-------------------|
