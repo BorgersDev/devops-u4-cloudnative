@@ -92,6 +92,10 @@ jobs:
       - name: Aplicar manifestos
         run: |
           kubectl apply -f k8s/namespace.yaml
+          # ConfigMap do sidecar otel-collector, necessario antes dos Deployments
+          # (montado como volume nos pods). O stack Prometheus/Jaeger e instalado
+          # a parte (ver README), mas a config do sidecar acompanha o deploy da app.
+          kubectl apply -f k8s/observability/otel-collector-config.yaml
           kubectl apply -f k8s/data-service/
           kubectl apply -f k8s/gateway-service/
 

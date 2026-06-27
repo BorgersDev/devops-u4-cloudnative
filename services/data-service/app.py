@@ -3,18 +3,86 @@
 Expoe dados simulados, suporta latencia controlada para testar o timeout do
 gateway e recebe sincronizacoes idempotentes da borda via POST /sync.
 
-Escopo do Passo 1. Metricas Prometheus e OpenTelemetry entram no Passo 2.
+Passo 2: expoe metricas Prometheus em GET /metrics e emite spans OpenTelemetry
+para o sidecar otel-collector.
 """
 
-import json
 import os
 import threading
 import time
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, g, jsonify, request
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 
 app = Flask(__name__)
+
+# Nome usado nas labels de metricas e como service.name no tracing.
+SERVICE_NAME = os.environ.get("OTEL_SERVICE_NAME", "data-service")
+
+# Metricas exigidas pelo Passo 2 (FR-12). O contador e o histograma sao rotulados
+# por servico, metodo e endpoint. A metrica de CPU (process_cpu_seconds_total) vem
+# automaticamente do ProcessCollector padrao do prometheus_client.
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total de requisicoes HTTP processadas",
+    ["service", "method", "endpoint", "http_status"],
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "Duracao das requisicoes HTTP em segundos",
+    ["service", "method", "endpoint"],
+)
+
+
+@app.before_request
+def _start_timer():
+    g._start_time = time.perf_counter()
+
+
+@app.after_request
+def _record_metrics(response):
+    """Registra contador e latencia por requisicao, exceto o proprio /metrics."""
+    endpoint = request.endpoint or "unknown"
+    if endpoint != "metrics":
+        elapsed = time.perf_counter() - getattr(g, "_start_time", time.perf_counter())
+        REQUEST_LATENCY.labels(SERVICE_NAME, request.method, endpoint).observe(elapsed)
+        REQUEST_COUNT.labels(
+            SERVICE_NAME, request.method, endpoint, response.status_code
+        ).inc()
+    return response
+
+
+@app.get("/metrics")
+def metrics():
+    """Exposicao no formato texto do Prometheus (scrape por annotations)."""
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+
+def setup_tracing():
+    """Configura o OpenTelemetry no worker pos-fork do gunicorn.
+
+    Roda no hook post_fork (ver gunicorn.conf.py) e nao no master, pois o
+    BatchSpanProcessor mantem uma thread propria que nao sobrevive ao fork. O
+    exportador OTLP/gRPC le OTEL_EXPORTER_OTLP_ENDPOINT (sidecar em localhost:4317).
+    """
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    FlaskInstrumentor().instrument_app(app)
+    app.logger.info("OpenTelemetry configurado para service.name=%s", SERVICE_NAME)
 
 # Latencia padrao aplicada ao GET /data quando o cliente nao informa delay_ms.
 # Permite simular um produtor lento sem alterar o cliente (usado no Passo 3).

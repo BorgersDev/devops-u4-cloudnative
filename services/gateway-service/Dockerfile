@@ -10,9 +10,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY app.py gunicorn.conf.py ./
 
 EXPOSE 8000
 
-# --workers 1 conforme entrega (consistencia do prometheus_client no Passo 2).
-CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:8000", "app:app"]
+# --workers 1 conforme entrega: registro do prometheus_client consistente e um unico
+# worker para o OpenTelemetry (setup no post_fork de gunicorn.conf.py).
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "--workers", "1", "--bind", "0.0.0.0:8000", "app:app"]

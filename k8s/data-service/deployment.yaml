@@ -20,6 +20,12 @@ spec:
         component: producer
         tier: backend
         part-of: devops-u4-cloudnative
+      # Annotations de scrape: o Prometheus descobre o pod e raspa o /metrics do
+      # container app na porta 8000 (Passo 2, FR-13).
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
     spec:
       containers:
         - name: data-service
@@ -32,6 +38,15 @@ spec:
           env:
             - name: RESPONSE_DELAY_MS
               value: "0"
+            # OTEL_SERVICE_NAME distingue os servicos no Jaeger (FR-14).
+            - name: OTEL_SERVICE_NAME
+              value: "data-service"
+            # Exporta spans para o sidecar otel-collector via OTLP gRPC em localhost.
+            # O esquema http:// sinaliza canal inseguro (sem TLS) no exportador gRPC.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://localhost:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
           resources:
             requests:
               cpu: "50m"
@@ -55,3 +70,28 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
+        # Padrao sidecar (FR-15): collector OTel no mesmo pod do app. Recebe spans
+        # em localhost:4317/4318 e os encaminha ao Jaeger. Imagem contrib oficial,
+        # multi-arch (roda no cluster arm64).
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.110.0
+          args: ["--config=/conf/collector.yaml"]
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+          volumeMounts:
+            - name: otel-collector-config
+              mountPath: /conf
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+      volumes:
+        - name: otel-collector-config
+          configMap:
+            name: otel-collector-config

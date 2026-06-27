@@ -1,3 +1,11 @@
 Flask==3.0.3
 gunicorn==22.0.0
 requests==2.32.3
+# opentelemetry-instrumentation 0.48b0 ainda usa pkg_resources, removido no
+# setuptools >= 81. Fixamos abaixo disso para o tracing inicializar no worker.
+setuptools==80.9.0
+prometheus-client==0.20.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-grpc==1.27.0
+opentelemetry-instrumentation-flask==0.48b0
+opentelemetry-instrumentation-requests==0.48b0

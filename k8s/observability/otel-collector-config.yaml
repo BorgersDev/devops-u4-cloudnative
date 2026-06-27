@@ -1,0 +1,36 @@
+# Configuracao compartilhada pelo sidecar otel-collector de cada app.
+# Recebe spans via OTLP (gRPC 4317 / HTTP 4318) dos containers da aplicacao em
+# localhost e os encaminha para o Jaeger all-in-one (OTLP gRPC na porta 4317).
+# Aplicada pelo pipeline antes dos Deployments (ver .github/workflows/deploy.yml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: cloudnative
+  labels:
+    app: otel-collector
+    part-of: devops-u4-cloudnative
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch: {}
+    exporters:
+      otlp/jaeger:
+        endpoint: jaeger.cloudnative.svc.cluster.local:4317
+        tls:
+          insecure: true
+      debug:
+        verbosity: basic
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/jaeger, debug]
