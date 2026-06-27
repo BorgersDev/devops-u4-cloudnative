@@ -1,35 +1,22 @@
 # Evidencias - Passo 1 (CI/CD e GHCR)
 
-Execucao real do pipeline apos publicar o repositorio.
+Execucao real do pipeline `build-and-deploy` (GitHub Actions, push para `main`).
 
 ## Repositorio
 - https://github.com/BorgersDev/devops-u4-cloudnative (publico)
 
-## Run do GitHub Actions
-- Run: https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28299616528
-- Commit (headSha): `5b497613cf2d5c99e2e59c52f76736ded5081ab9`
-- SHA curto implantado: `5b49761`
-- Workflow: `build-and-deploy` (push para `main`)
-
-### Status dos jobs (primeiro run)
-| Job                                  | Status            |
-|--------------------------------------|-------------------|
-| Build e push das imagens (GHCR)      | completed/success |
-| Deploy automatico no cluster         | queued (sem runner ainda) |
-
-> Esse primeiro run validou build+push. O job de deploy ficou `queued` ate o
-> self-hosted runner ser registrado, e as imagens iniciais eram amd64-only.
-
-### Run final (deploy verde)
+## Run final (evidencia principal) - deploy verde de ponta a ponta
 - Run: https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28300267604
-- Commit/tag: `a281c7e` (imagens **multi-arch** amd64+arm64)
+- Commit / tag implantada: `a281c7e`
+- Imagens **multi-arch** (amd64 + arm64), para rodar no cluster arm64 (Apple Silicon).
 
 | Job                                  | Status            |
 |--------------------------------------|-------------------|
 | Build e push das imagens (GHCR)      | completed/success |
 | Deploy automatico no cluster         | completed/success |
 
-Detalhes do deploy no cluster em [`deploy-kubernetes.md`](deploy-kubernetes.md).
+Detalhes do deploy no cluster (pods, services, rollout status, chamada ao
+gateway) em [`deploy-kubernetes.md`](deploy-kubernetes.md).
 
 ## Imagens publicadas no GHCR (publicas)
 
@@ -37,19 +24,22 @@ Confirmadas via `docker manifest inspect` (sem autenticacao, pois sao publicas):
 
 ```text
 OK  ghcr.io/borgersdev/devops-u4-cloudnative/data-service:latest
-OK  ghcr.io/borgersdev/devops-u4-cloudnative/data-service:5b49761
+OK  ghcr.io/borgersdev/devops-u4-cloudnative/data-service:a281c7e
 OK  ghcr.io/borgersdev/devops-u4-cloudnative/gateway-service:latest
-OK  ghcr.io/borgersdev/devops-u4-cloudnative/gateway-service:5b49761
+OK  ghcr.io/borgersdev/devops-u4-cloudnative/gateway-service:a281c7e
 ```
 
 Cada servico tem duas tags: `latest` e o SHA curto do commit. O deploy usa a tag
 por SHA curto para rastreabilidade.
 
-## Pendente (precisa do cluster + self-hosted runner)
+## Historico (runs anteriores)
 
-- [ ] Job de deploy verde (apos registrar o runner `k8s`).
-- [ ] `kubectl rollout status` dos dois Deployments (executado pelo workflow).
-- [ ] `kubectl get pods -n cloudnative` (Running/Ready).
-- [ ] `kubectl get svc -n cloudnative` (ClusterIP).
-- [ ] Deployment usando a imagem com tag por SHA curto.
-- [ ] Requisicao ao gateway no cluster retornando dados do data-service.
+Contexto de como se chegou ao run final. Nao sao pendencias:
+
+- **Run inicial** ([28299616528](https://github.com/BorgersDev/devops-u4-cloudnative/actions/runs/28299616528),
+  commit `5b49761`): validou build + push no GHCR. O job de deploy ficou `queued`
+  ate o self-hosted runner (label `k8s`) ser registrado.
+- Apos registrar o runner, o deploy revelou que as imagens iniciais eram
+  amd64-only (`no matching manifest for linux/arm64`). O workflow passou a buildar
+  **multi-arch** (QEMU + `platforms: linux/amd64,linux/arm64`), o que levou ao
+  run final verde acima.
