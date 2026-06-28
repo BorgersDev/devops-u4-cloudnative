@@ -62,9 +62,10 @@ fork. Com `--workers 1` ha um unico worker, alinhado tambem a consistencia do
 `prometheus_client`. Os logs do sidecar (ver `tracing-jaeger.md`) confirmam que
 os spans realmente chegam ao collector e seguem para o Jaeger.
 
-## Print de UI/console que falta (tirar manualmente)
+## Print (salvo em `images/`)
 
-1. **Pod com 2 containers**: terminal com
-   `kubectl -n cloudnative get pods` mostrando `2/2` para os dois apps, ou
-   `kubectl -n cloudnative describe pod <gateway-pod>` listando os containers
-   `gateway-service` e `otel-collector`.
+1. **Pod com 2 containers** (`images/07-pods-2-containers-sidecar.webp`):
+   `kubectl -n cloudnative get pods` mostrando `2/2` em READY para `data-service`
+   e `gateway-service` (app + sidecar `otel-collector` no mesmo pod).
+
+   ![Pods 2/2 com sidecar](images/07-pods-2-containers-sidecar.webp)

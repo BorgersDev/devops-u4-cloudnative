@@ -17,7 +17,7 @@
   - OpenTelemetry (Flask + requests) com setup no `post_fork` do gunicorn; sidecar `otel-collector` por pod.
   - Jaeger all-in-one (OTLP) exibindo trace multi-servico `gateway-service` -> `data-service`.
   - Deploy da app pelo pipeline (run `28301660010`, tag por SHA curto `9bbd924`), pods `2/2` (app + sidecar).
-  - Evidencias em `docs/evidencias/passo-2/` (`prometheus-observabilidade.md`, `tracing-jaeger.md`, `sidecar-e-deploy.md`).
+  - Evidencias em `docs/evidencias/passo-2/` (`prometheus-observabilidade.md`, `tracing-jaeger.md`, `sidecar-e-deploy.md`) com os 7 prints de UI em `docs/evidencias/passo-2/images/` (targets UP, 3 PromQL, lista de traces, trace multi-servico e pods 2/2).
 - **Passo 3 (Edge Computing): PENDENTE.**
 
 ## 1. Introducao / Visao Geral

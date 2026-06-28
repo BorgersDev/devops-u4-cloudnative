@@ -55,10 +55,16 @@ O contexto W3C `traceparent` propagado pela instrumentacao de `requests` liga os
 spans dos dois servicos em um unico trace, mostrando tempo por etapa e a relacao
 pai/filho entre eles.
 
-## Prints de UI que faltam (tirar manualmente)
+## Prints (salvos em `images/`)
 
-1. **Jaeger - busca**: `http://localhost:16686`, Service = `gateway-service`,
-   operacao `GET /`, clicar em **Find Traces** e capturar a lista.
-2. **Jaeger - trace completo**: abrir um trace de `GET /` e capturar a timeline
-   mostrando os spans `gateway-service GET /`, `gateway-service GET` e
-   `data-service GET /data` (dois servicos no mesmo trace).
+1. **Jaeger - lista de traces** (`images/05-jaeger-lista-traces.webp`):
+   `http://localhost:16686`, Service `gateway-service`, operacao `GET /`. Cada
+   trace mostra `3 Spans` com os selos `data-service (1)` e `gateway-service (2)`.
+
+   ![Lista de traces](images/05-jaeger-lista-traces.webp)
+
+2. **Jaeger - trace completo multi-servico** (`images/06-jaeger-trace-multiservico.webp`):
+   timeline com `gateway-service GET /` -> `gateway-service GET` ->
+   `data-service GET /data`. Cabecalho indica `Services 2, Total Spans 3`.
+
+   ![Trace multi-servico](images/06-jaeger-trace-multiservico.webp)

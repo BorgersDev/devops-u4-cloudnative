@@ -81,14 +81,27 @@ http_request_duration_seconds_sum{endpoint="health_live",method="GET",service="g
 # ... buckets le="0.005" ... le="+Inf"
 ```
 
-## Prints de UI que faltam (tirar manualmente)
+## Prints (salvos em `images/`)
 
-1. **Targets UP**: `http://localhost:9090/targets` mostrando `data-service` e
-   `gateway-service` como `UP` (job `kubernetes-pods`).
-2. **PromQL http_requests_total**: em `http://localhost:9090/graph`, executar
-   `http_requests_total{service="gateway-service"}` e capturar a tabela/grafico.
-3. **PromQL http_request_duration_seconds**: executar
-   `histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))`
-   ou simplesmente `http_request_duration_seconds_count` e capturar.
-4. **PromQL CPU**: executar `process_cpu_seconds_total` (ou
-   `rate(process_cpu_seconds_total[5m])`) e capturar.
+1. **Targets UP** (`images/01-prometheus-targets-up.webp`):
+   `http://localhost:9090/targets` mostrando `data-service` e `gateway-service`
+   como `UP` no job `kubernetes-pods (2/2 up)`.
+
+   ![Targets UP](images/01-prometheus-targets-up.webp)
+
+2. **PromQL `http_requests_total`** (`images/02-promql-http-requests-total.webp`):
+   consulta `http_requests_total{service="gateway-service"}` com o contador por
+   endpoint.
+
+   ![http_requests_total](images/02-promql-http-requests-total.webp)
+
+3. **PromQL `http_request_duration_seconds`** (`images/03-promql-latencia.webp`):
+   consulta `http_request_duration_seconds_count` por servico/endpoint
+   (`data-service get_data` casa com `gateway-service index`).
+
+   ![latencia](images/03-promql-latencia.webp)
+
+4. **PromQL CPU** (`images/04-promql-cpu.webp`): consulta
+   `process_cpu_seconds_total` por processo.
+
+   ![cpu](images/04-promql-cpu.webp)
