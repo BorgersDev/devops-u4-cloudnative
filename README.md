@@ -4,15 +4,19 @@ Arquitetura cloud-native com dois microsservicos Flask, conteinerizacao,
 Kubernetes, CI/CD, observabilidade, tracing distribuido e simulacao de edge
 computing. Entrega da atividade U4.
 
-> Estado atual: **Passos 1 e 2 concluidos e comprovados de ponta a ponta**.
+> Estado atual: **Passos 1, 2 e 3 concluidos e comprovados de ponta a ponta**.
 > Passo 1: pipeline verde (build multi-arch + push no GHCR), deploy automatico no
 > Minikube (Calico) via self-hosted runner, pods `Running/Ready`, Services
 > `ClusterIP`, Deployment usando a tag por SHA curto e chamada real ao gateway.
 > Passo 2: `/metrics` nos dois servicos, Prometheus coletando por annotations com
 > os dois targets `UP`, OpenTelemetry com sidecar `otel-collector` por pod e
 > Jaeger exibindo trace multi-servico (`gateway-service` -> `data-service`).
-> Evidencias em `docs/evidencias/passo-1/` e `docs/evidencias/passo-2/`.
-> O Passo 3 (edge) e um incremento sobre esta base.
+> Passo 3: namespace `edge`, gateway de borda com buffer local, `NetworkPolicy`
+> simulando desconexao, latencia demonstrada a parte, probes tolerantes,
+> Pushgateway local e `scripts/sync.py` idempotente. Comprovado no cluster
+> (Minikube+Calico) em `docs/evidencias/passo-3/validacao-cluster.md` e validado
+> tambem localmente em `docs/evidencias/passo-3/validacao-local.md`.
+> Evidencias em `docs/evidencias/passo-1/`, `passo-2/` e `passo-3/`.
 
 ## Arquitetura
 
@@ -31,7 +35,7 @@ usuario --> gateway-service (GET /) --HTTP--> data-service (GET /data)
 ```text
 services/        codigo, Dockerfile e gunicorn.conf.py de cada microsservico
 k8s/             manifestos Kubernetes (namespace, deployments, services, observability)
-scripts/         scripts de apoio (deploy local, generate-traffic; offline/sync no Passo 3)
+scripts/         scripts de apoio (deploy local, generate-traffic, simulate-offline, restore-connection, sync.py)
 docs/            decisoes tecnicas, etica e evidencias por passo
 .github/workflows/deploy.yml   pipeline build + push + deploy
 ```
@@ -62,6 +66,9 @@ docs/            decisoes tecnicas, etica e evidencias por passo
 | data-service    | `SYNC_STORE_PATH`               | (vazio)                 | Arquivo para persistir `event_id`.   |
 | gateway-service | `DATA_SERVICE_URL`              | `http://localhost:8000` | URL do produtor.                     |
 | gateway-service | `DATA_SERVICE_TIMEOUT_SECONDS`  | `2.0`                   | Timeout da chamada ao produtor.      |
+| gateway-service | `EDGE_BUFFER_PATH`              | (vazio)                 | Liga o modo borda: grava buffer local em modo degradado (Passo 3). |
+| gateway-service | `PUSHGATEWAY_URL`              | (vazio)                 | Pushgateway local p/ metrica offline (Passo 3). |
+| gateway-service | `OTEL_SDK_DISABLED`            | (vazio)                 | `true` desliga o tracing na borda (sem sidecar/Jaeger). |
 | ambos           | `OTEL_SERVICE_NAME`             | nome do servico         | `service.name` no tracing (Jaeger).  |
 | ambos           | `OTEL_EXPORTER_OTLP_ENDPOINT`   | `http://localhost:4317` | Sidecar otel-collector (OTLP/gRPC).  |
 
@@ -171,6 +178,51 @@ kubectl -n cloudnative port-forward svc/jaeger 16686:16686 &
 #   trace com spans de gateway-service e data-service
 ```
 
+## Edge computing (Passo 3)
+
+Simula o `gateway-service` rodando na **borda**: continua respondendo quando o
+central fica indisponivel (modo degradado), grava eventos em **buffer local** e
+sincroniza depois, de forma idempotente. A borda vive no namespace `edge` e usa a
+**mesma imagem** do gateway central; o modo borda e ativado por variaveis de ambiente
+(`EDGE_BUFFER_PATH`, `PUSHGATEWAY_URL`, `OTEL_SDK_DISABLED`).
+
+> Requer CNI que **aplica** `NetworkPolicy` (Calico no Minikube ou K3s). O CNI padrao
+> do Minikube aceita a policy mas nao a aplica, e o bloqueio do offline nao ocorreria.
+
+Subir a borda (substitua `OWNER` pelo dono do repo, minusculo):
+```bash
+kubectl apply -f k8s/edge/namespace.yaml
+kubectl apply -f k8s/edge/pushgateway.yaml
+sed "s#ghcr.io/OWNER/#ghcr.io/<owner>/#g" k8s/edge/gateway-edge-deployment.yaml | kubectl apply -f -
+kubectl apply -f k8s/edge/gateway-edge-service.yaml
+kubectl -n edge get pods
+```
+
+Ciclo offline -> buffer -> reconexao -> sync:
+```bash
+kubectl -n edge port-forward svc/gateway-edge 8200:8000 &
+
+./scripts/simulate-offline.sh        # aplica NetworkPolicy que bloqueia o central
+curl localhost:8200/                 # degraded:true + buffered_event_id (sem 500)
+kubectl -n edge logs deploy/gateway-edge | grep bufferizado
+minikube ssh -- cat /mnt/edge-buffer/buffer.jsonl   # eventos no buffer (hostPath)
+
+./scripts/restore-connection.sh      # remove a policy, restaura a conectividade
+python scripts/sync.py --url http://localhost:8000 --buffer ./buffer.jsonl  # idempotente
+```
+
+- **Latencia** (separada da desconexao): `kubectl -n cloudnative set env
+  deployment/data-service RESPONSE_DELAY_MS=1500` deixa o produtor lento acima do
+  timeout do gateway de borda, gerando modo degradado por `timeout`.
+- **Observabilidade offline**: `kubectl -n edge port-forward svc/pushgateway 9091:9091`
+  e `curl localhost:9091/metrics | grep edge_buffered_events_total`.
+- **Probes tolerantes**: liveness/readiness em `k8s/edge/gateway-edge-deployment.yaml`,
+  com a justificativa dos valores em comentario e em `docs/decisoes-tecnicas.md`.
+
+Evidencias do Passo 3 em `docs/evidencias/passo-3/`: execucao real no cluster
+(`validacao-cluster.md`), validacao local de buffer/sync/idempotencia
+(`validacao-local.md`) e o passo a passo de reproducao (`reproduzir-no-cluster.md`).
+
 ## CI/CD: estrategia de deploy automatico
 
 `.github/workflows/deploy.yml` dispara em push para `main` e tem dois jobs:
@@ -206,6 +258,7 @@ Imagens **publicas** no GHCR evitam `imagePullSecret`. Se forem privadas, crie u
 - [`docs/etica-e-principios.md`](docs/etica-e-principios.md) - etica aplicada.
 - `docs/evidencias/passo-1/` - evidencias de build, deploy e execucao.
 - `docs/evidencias/passo-2/` - evidencias de metricas (Prometheus), tracing (Jaeger) e sidecar.
+- `docs/evidencias/passo-3/` - evidencias do edge: `validacao-cluster.md` (execucao real no cluster), `validacao-local.md` (buffer/sync/idempotencia) e `reproduzir-no-cluster.md` (passo a passo para reproduzir).
 
 ## Seguranca
 

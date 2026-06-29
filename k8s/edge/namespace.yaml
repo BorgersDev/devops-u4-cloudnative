@@ -1,0 +1,12 @@
+# Namespace isolado para a simulacao de borda (Passo 3, US-010). O gateway de borda
+# roda aqui, separado do namespace principal `cloudnative`, para que a NetworkPolicy
+# possa restringir a comunicacao ate o central de forma realista.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edge
+  labels:
+    part-of: devops-u4-cloudnative
+    # Rotulo padrao adicionado pelo Kubernetes (>= 1.21). Deixado explicito porque a
+    # NetworkPolicy referencia o namespace por kubernetes.io/metadata.name.
+    kubernetes.io/metadata.name: edge

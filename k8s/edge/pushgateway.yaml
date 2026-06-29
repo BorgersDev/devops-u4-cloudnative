@@ -1,0 +1,67 @@
+# Pushgateway local no namespace edge para observabilidade offline (Passo 3, US-013).
+#
+# O gateway de borda envia o total de eventos bufferizados (Gauge
+# edge_buffered_events_total) ao Pushgateway sempre que entra em modo offline. O
+# Pushgateway NAO raspa nem mantem historico: ele apenas RETEM o ultimo valor por job
+# ate ser raspado por um Prometheus. No modelo de borda, ele guarda as metricas
+# durante a desconexao; um Prometheus central as raspa apos a reconexao. Esta e uma
+# limitacao consciente (documentada em docs/decisoes-tecnicas.md). Como alternativa
+# mais simples, o proprio log local do container ja cumpre o papel minimo offline.
+#
+# O Pushgateway vive dentro do namespace edge, entao continua acessivel mesmo quando
+# a NetworkPolicy edge-offline bloqueia a saida ate o central.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  namespace: edge
+  labels:
+    app: pushgateway
+    component: observability
+    tier: edge
+    part-of: devops-u4-cloudnative
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pushgateway
+  template:
+    metadata:
+      labels:
+        app: pushgateway
+        component: observability
+        tier: edge
+        part-of: devops-u4-cloudnative
+    spec:
+      containers:
+        - name: pushgateway
+          image: prom/pushgateway:v1.9.0
+          ports:
+            - name: http
+              containerPort: 9091
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushgateway
+  namespace: edge
+  labels:
+    app: pushgateway
+    component: observability
+    tier: edge
+    part-of: devops-u4-cloudnative
+spec:
+  type: ClusterIP
+  selector:
+    app: pushgateway
+  ports:
+    - name: http
+      port: 9091
+      targetPort: 9091

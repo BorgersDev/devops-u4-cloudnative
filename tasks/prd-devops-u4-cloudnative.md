@@ -18,7 +18,20 @@
   - Jaeger all-in-one (OTLP) exibindo trace multi-servico `gateway-service` -> `data-service`.
   - Deploy da app pelo pipeline (run `28301660010`, tag por SHA curto `9bbd924`), pods `2/2` (app + sidecar).
   - Evidencias em `docs/evidencias/passo-2/` (`prometheus-observabilidade.md`, `tracing-jaeger.md`, `sidecar-e-deploy.md`) com os 7 prints de UI em `docs/evidencias/passo-2/images/` (targets UP, 3 PromQL, lista de traces, trace multi-servico e pods 2/2).
-- **Passo 3 (Edge Computing): PENDENTE.**
+- **Passo 3 (Edge Computing): CONCLUIDO e comprovado de ponta a ponta.**
+  - Gateway de borda reusa a imagem do gateway central; modo borda ligado por env
+    (`EDGE_BUFFER_PATH`, `PUSHGATEWAY_URL`, `OTEL_SDK_DISABLED`).
+  - Manifests em `k8s/edge/` (namespace, networkpolicy `edge-offline`, deployment com
+    probes tolerantes + buffer `hostPath`, service e pushgateway local).
+  - Scripts `simulate-offline.sh`, `restore-connection.sh` e `sync.py` (idempotente).
+  - Comprovado no cluster (Minikube + Calico): `NetworkPolicy` bloqueando o central
+    (chamada direta da borda da timeout), gateway respondendo em modo degradado,
+    eventos gravados no buffer `hostPath`, probes mantendo o pod `Ready` sem restart,
+    Pushgateway local retendo `edge_buffered_events_total` e `sync.py` sincronizando
+    sem duplicar (`aceitos=0`/`total_conhecidos` estavel no reenvio).
+  - Evidencias em `docs/evidencias/passo-3/`: `validacao-cluster.md` (execucao real no
+    cluster) e `validacao-local.md` (buffer/sync/idempotencia sem cluster). Os prints
+    da UI/terminal acompanham a entrega.
 
 ## 1. Introducao / Visao Geral
 
@@ -238,17 +251,17 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 #### Criterios De Aceite
 
-- [ ] Namespace `edge` criado.
-- [ ] `gateway-service` roda no namespace `edge`.
-- [ ] `NetworkPolicy` simula conectividade restrita com o ambiente central.
-- [ ] Latencia e simulada com delay no produtor ou timeout controlado no gateway, gerando modo degradado sem derrubar o pod.
-- [ ] Liveness e readiness probes estao configuradas com `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds` e `failureThreshold` justificados em comentario ou documento.
-- [ ] Gateway continua respondendo quando o `data-service` central fica indisponivel.
-- [ ] Eventos sao gravados em buffer local durante o modo offline.
-- [ ] Observabilidade offline e demonstrada com Pushgateway local ou log rotativo local.
-- [ ] `scripts/sync.py` envia dados ao ambiente central apos reconexao.
-- [ ] A sincronizacao nao duplica eventos ja enviados.
-- [ ] README ou documento em `docs/` explica as decisoes de resiliencia da borda.
+- [x] Namespace `edge` criado. (`k8s/edge/namespace.yaml`)
+- [x] `gateway-service` roda no namespace `edge`. (`k8s/edge/gateway-edge-deployment.yaml`)
+- [x] `NetworkPolicy` simula conectividade restrita com o ambiente central. (`k8s/edge/networkpolicy.yaml`)
+- [x] Latencia e simulada com delay no produtor ou timeout controlado no gateway, gerando modo degradado sem derrubar o pod. (validado localmente: `reason: timeout`)
+- [x] Liveness e readiness probes estao configuradas com `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds` e `failureThreshold` justificados em comentario ou documento.
+- [x] Gateway continua respondendo quando o `data-service` central fica indisponivel. (HTTP 200 degraded, validado)
+- [x] Eventos sao gravados em buffer local durante o modo offline. (validado localmente)
+- [x] Observabilidade offline e demonstrada com Pushgateway local ou log rotativo local. (Pushgateway + log local)
+- [x] `scripts/sync.py` envia dados ao ambiente central apos reconexao. (validado localmente)
+- [x] A sincronizacao nao duplica eventos ja enviados. (idempotencia validada por `event_id`)
+- [x] README ou documento em `docs/` explica as decisoes de resiliencia da borda.
 
 #### Evidencias Esperadas
 
@@ -384,12 +397,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] Namespace `edge` existe.
-- [ ] Gateway possui Deployment especifico para borda.
-- [ ] O cluster usa um CNI que aplica `NetworkPolicy` (Calico no Minikube ou K3s) e ha evidencia de que a policy realmente bloqueia o trafego.
-- [ ] NetworkPolicy restringe comunicacao com o central.
-- [ ] Ha evidencia separada de restricao por latencia, usando delay no produtor acima do timeout do gateway.
-- [ ] A alternativa com K3s e documentada como opcional.
+- [x] Namespace `edge` existe. (`k8s/edge/namespace.yaml`)
+- [x] Gateway possui Deployment especifico para borda. (`gateway-edge-deployment.yaml`)
+- [x] O cluster usa um CNI que aplica `NetworkPolicy` (Calico no Minikube ou K3s) e ha evidencia de que a policy realmente bloqueia o trafego. (Minikube+Calico; chamada direta da borda ao central da timeout sob a policy)
+- [x] NetworkPolicy restringe comunicacao com o central. (`networkpolicy.yaml` egress allow-list)
+- [x] Ha evidencia separada de restricao por latencia, usando delay no produtor acima do timeout do gateway. (validado: `reason: timeout`)
+- [x] A alternativa com K3s e documentada como opcional. (README e decisoes-tecnicas)
 
 ### US-011: Configurar Probes Tolerantes
 
@@ -397,10 +410,10 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `livenessProbe` usa endpoint local e nao depende do central.
-- [ ] `readinessProbe` confirma capacidade de atender em modo normal ou degradado.
-- [ ] Tempos e thresholds estao ajustados para quedas curtas.
-- [ ] A justificativa dos valores esta documentada.
+- [x] `livenessProbe` usa endpoint local e nao depende do central. (`/health/live`)
+- [x] `readinessProbe` confirma capacidade de atender em modo normal ou degradado. (`/health/ready` retorna pronto degradado)
+- [x] Tempos e thresholds estao ajustados para quedas curtas. (liveness 6x15s ~90s)
+- [x] A justificativa dos valores esta documentada. (comentario no manifest + decisoes-tecnicas)
 
 ### US-012: Implementar Buffer Local Offline
 
@@ -408,11 +421,11 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] Deployment de borda monta volume para buffer.
-- [ ] Gateway detecta timeout ou erro de conexao com o central.
-- [ ] Ao receber uma requisicao em modo offline, o gateway grava no buffer um evento `{event_id (uuid), timestamp, path, payload}`.
-- [ ] O `event_id` e gerado uma unica vez por requisicao e e o que viabiliza a deduplicacao no `POST /sync`.
-- [ ] Gateway continua retornando resposta controlada ao usuario.
+- [x] Deployment de borda monta volume para buffer. (`hostPath` em `/data`)
+- [x] Gateway detecta timeout ou erro de conexao com o central. (validado)
+- [x] Ao receber uma requisicao em modo offline, o gateway grava no buffer um evento `{event_id (uuid), timestamp, path, payload}`. (validado)
+- [x] O `event_id` e gerado uma unica vez por requisicao e e o que viabiliza a deduplicacao no `POST /sync`. (uuid4 por requisicao)
+- [x] Gateway continua retornando resposta controlada ao usuario. (HTTP 200 degraded)
 
 ### US-013: Simular Observabilidade Offline
 
@@ -420,9 +433,9 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] Pushgateway local ou log rotativo local esta configurado.
-- [ ] A escolha e documentada com limitacoes, incluindo que o Pushgateway apenas retem metricas ate ser raspado por um Prometheus apos a reconexao.
-- [ ] Ha evidencia de metricas ou logs sendo retidos offline.
+- [x] Pushgateway local ou log rotativo local esta configurado. (`k8s/edge/pushgateway.yaml` + log local)
+- [x] A escolha e documentada com limitacoes, incluindo que o Pushgateway apenas retem metricas ate ser raspado por um Prometheus apos a reconexao. (decisoes-tecnicas)
+- [x] Ha evidencia de metricas ou logs sendo retidos offline. (Pushgateway retem `edge_buffered_events_total` no namespace edge + log local)
 
 ### US-014: Sincronizar Dados Apos Reconexao
 
@@ -430,10 +443,10 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] `scripts/sync.py` le o buffer local de eventos `{event_id, timestamp, path, payload}`.
-- [ ] Script envia os eventos ao `POST /sync` do `data-service` ou endpoint mock documentado.
-- [ ] Script marca eventos sincronizados ou os remove apenas apos resposta de sucesso.
-- [ ] Rodadas repetidas nao duplicam eventos no central, pois o `data-service` deduplica por `event_id`.
+- [x] `scripts/sync.py` le o buffer local de eventos `{event_id, timestamp, path, payload}`.
+- [x] Script envia os eventos ao `POST /sync` do `data-service` ou endpoint mock documentado.
+- [x] Script marca eventos sincronizados ou os remove apenas apos resposta de sucesso. (remove `accepted`+`ignored`)
+- [x] Rodadas repetidas nao duplicam eventos no central, pois o `data-service` deduplica por `event_id`. (validado)
 
 ### US-015: Documentar Decisoes E Evidencias
 
@@ -441,12 +454,12 @@ Simular a execucao do `gateway-service` em ambiente de borda, mantendo funcionam
 
 **Acceptance Criteria:**
 
-- [ ] README possui instrucoes de execucao local, Kubernetes, observabilidade e edge.
-- [ ] `docs/decisoes-tecnicas.md` descreve escolhas e trade-offs.
-- [ ] `docs/etica-e-principios.md` descreve responsabilidade, colaboracao, bem comum, seguranca de secrets, uso consciente de recursos e transparencia das evidencias.
-- [ ] `docs/evidencias/passo-1/` contem evidencias de build, deploy e execucao.
+- [x] README possui instrucoes de execucao local, Kubernetes, observabilidade e edge.
+- [x] `docs/decisoes-tecnicas.md` descreve escolhas e trade-offs.
+- [x] `docs/etica-e-principios.md` descreve responsabilidade, colaboracao, bem comum, seguranca de secrets, uso consciente de recursos e transparencia das evidencias.
+- [x] `docs/evidencias/passo-1/` contem evidencias de build, deploy e execucao.
 - [x] `docs/evidencias/passo-2/` contem evidencias de Prometheus e Jaeger.
-- [ ] `docs/evidencias/passo-3/` contem evidencias de offline, probes, buffer e sync.
+- [x] `docs/evidencias/passo-3/` contem evidencias de offline, probes, buffer e sync. (`validacao-cluster.md` + `validacao-local.md`)
 
 ## 6. Functional Requirements
 
@@ -550,12 +563,12 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 - [x] Prometheus coleta metricas dos dois servicos.
 - [x] Jaeger mostra trace distribuido com spans dos dois servicos.
 - [x] Sidecar OpenTelemetry Collector ou agent equivalente aparece nos pods da aplicacao.
-- [ ] Namespace `edge` simula conectividade restrita.
-- [ ] Gateway de borda opera em modo degradado com buffer local.
-- [ ] Script de sincronizacao envia dados ao central apos reconexao.
-- [ ] Simulacao de latencia e simulacao de desconexao foram demonstradas separadamente.
+- [x] Namespace `edge` simula conectividade restrita. (manifests `k8s/edge/`)
+- [x] Gateway de borda opera em modo degradado com buffer local. (validado localmente)
+- [x] Script de sincronizacao envia dados ao central apos reconexao. (`scripts/sync.py`, validado)
+- [x] Simulacao de latencia e simulacao de desconexao foram demonstradas separadamente. (`reason` distinto por cenario)
 - [x] `docs/etica-e-principios.md` conecta decisoes tecnicas a responsabilidade, colaboracao, bem comum, seguranca e transparencia.
-- [ ] Evidencias dos tres passos estao salvas em `docs/evidencias/` (Passos 1 e 2 concluidos; Passo 3 pendente).
+- [x] Evidencias dos tres passos estao salvas em `docs/evidencias/` (Passos 1, 2 e 3 completos).
 - [x] README descreve como reproduzir a entrega.
 
 ## 11. Success Metrics
@@ -603,20 +616,20 @@ O arquivo `docs/etica-e-principios.md` deve explicar esses pontos e relacionar c
 
 ### Passo 3
 
-- [ ] Namespace `edge`.
-- [ ] Gateway de borda.
-- [ ] NetworkPolicy restritiva.
-- [ ] Simulacao de latencia.
-- [ ] Probes ajustadas.
-- [ ] Buffer local.
-- [ ] Pushgateway local ou log rotativo local.
-- [ ] Scripts de offline, reconexao e sync.
-- [ ] Evidencias de latencia, offline, probes, buffer e sincronizacao.
+- [x] Namespace `edge`.
+- [x] Gateway de borda.
+- [x] NetworkPolicy restritiva.
+- [x] Simulacao de latencia.
+- [x] Probes ajustadas.
+- [x] Buffer local.
+- [x] Pushgateway local ou log rotativo local.
+- [x] Scripts de offline, reconexao e sync.
+- [x] Evidencias de latencia, offline, probes, buffer e sincronizacao. (cluster em `validacao-cluster.md` + local em `validacao-local.md`)
 
 ### Etica E Organizacao
 
 - [x] README reproduzivel.
 - [x] `docs/decisoes-tecnicas.md`.
 - [x] `docs/etica-e-principios.md`.
-- [~] Evidencias organizadas por passo (Passos 1 e 2 concluidos; Passo 3 pendente).
+- [x] Evidencias organizadas por passo (Passos 1, 2 e 3 concluidos).
 - [x] Nenhum secret, token ou kubeconfig versionado.

@@ -68,6 +68,8 @@ $ curl -s localhost:8200/
 {"data":{...,"service":"data-service"},"degraded":false, ...}
 ```
 
+![docker build e run local dos dois servicos](images/06-docker-build-local.webp)
+
 ## Execucao no cluster (concluida)
 
 Todas as evidencias abaixo foram coletadas e estao em arquivos dedicados:

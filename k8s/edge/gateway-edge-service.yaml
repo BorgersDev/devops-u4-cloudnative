@@ -1,0 +1,20 @@
+# Service ClusterIP do gateway de borda. Usado para port-forward nas evidencias
+# (chamar GET / e observar o modo degradado/offline) e para o /metrics local.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-edge
+  namespace: edge
+  labels:
+    app: gateway-edge
+    component: consumer
+    tier: edge
+    part-of: devops-u4-cloudnative
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway-edge
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

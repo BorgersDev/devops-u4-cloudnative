@@ -18,6 +18,8 @@ Execucao real do pipeline `build-and-deploy` (GitHub Actions, push para `main`).
 Detalhes do deploy no cluster (pods, services, rollout status, chamada ao
 gateway) em [`deploy-kubernetes.md`](deploy-kubernetes.md).
 
+![GitHub Actions: build, push e deploy verdes](images/01-github-actions-build-push-deploy-success.webp)
+
 ## Imagens publicadas no GHCR (publicas)
 
 Confirmadas via `docker manifest inspect` (sem autenticacao, pois sao publicas):
@@ -31,6 +33,8 @@ OK  ghcr.io/borgersdev/devops-u4-cloudnative/gateway-service:a281c7e
 
 Cada servico tem duas tags: `latest` e o SHA curto do commit. O deploy usa a tag
 por SHA curto para rastreabilidade.
+
+![Imagens multi-arch publicadas no GHCR](images/02-ghcr-imagens-publicadas-multiarch.webp)
 
 ## Historico (runs anteriores)
 

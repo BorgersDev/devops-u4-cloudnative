@@ -1,0 +1,100 @@
+# Variante de borda do gateway-service (Passo 3, US-010/011/012). Usa a MESMA imagem
+# do gateway central; o comportamento de borda e ativado por variaveis de ambiente
+# (EDGE_BUFFER_PATH liga o buffer local; OTEL_SDK_DISABLED desliga o tracing, pois
+# nao ha sidecar/Jaeger alcancavel offline).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-edge
+  namespace: edge
+  labels:
+    app: gateway-edge
+    component: consumer
+    tier: edge
+    part-of: devops-u4-cloudnative
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-edge
+  template:
+    metadata:
+      labels:
+        app: gateway-edge
+        component: consumer
+        tier: edge
+        part-of: devops-u4-cloudnative
+      # Mantem o /metrics raspavel por um Prometheus que cubra o namespace edge.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
+    spec:
+      containers:
+        - name: gateway-edge
+          # OWNER deve ser substituido pelo dono do repositorio (minusculo).
+          # Mesma imagem do gateway central; o modo borda vem das envs abaixo.
+          image: ghcr.io/OWNER/devops-u4-cloudnative/gateway-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            # Aponta para o data-service do namespace central via DNS interno.
+            - name: DATA_SERVICE_URL
+              value: "http://data-service.cloudnative.svc.cluster.local:8000"
+            # Timeout curto: com a NetworkPolicy ativa (offline) ou com delay no
+            # produtor (latencia), a chamada estoura rapido e cai em modo degradado.
+            - name: DATA_SERVICE_TIMEOUT_SECONDS
+              value: "1.0"
+            # Liga o modo borda: grava eventos no buffer local em falha/timeout.
+            - name: EDGE_BUFFER_PATH
+              value: "/data/buffer.jsonl"
+            # Pushgateway local para observabilidade offline (US-013).
+            - name: PUSHGATEWAY_URL
+              value: "http://pushgateway.edge.svc.cluster.local:9091"
+            # Sem sidecar/Jaeger na borda: desliga o tracing para nao gerar erros.
+            - name: OTEL_SDK_DISABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: edge-buffer
+              mountPath: /data
+          # Probes tolerantes a instabilidade (US-011). Justificativa dos valores:
+          # - livenessProbe usa /health/live, que so verifica se o PROCESSO esta vivo
+          #   e NAO depende do central. failureThreshold alto (6) x periodSeconds 15
+          #   tolera ~90s de instabilidade antes de reiniciar, evitando restart
+          #   desnecessario durante quedas curtas de conectividade.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 6
+          # - readinessProbe usa /health/ready, que retorna pronto mesmo em modo
+          #   degradado (o gateway atende localmente e bufferiza). Assim o pod
+          #   permanece Ready durante o offline, refletindo autonomia local.
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+      volumes:
+        # Buffer local resiliente. hostPath sobrevive a recriacao do pod (ao
+        # contrario de emptyDir), conforme recomendado no PRD. No Minikube aponta
+        # para o filesystem da VM/container do Minikube; inspecione com `minikube ssh`.
+        # Para uma demonstracao efemera, troque por `emptyDir: {}`.
+        - name: edge-buffer
+          hostPath:
+            path: /mnt/edge-buffer
+            type: DirectoryOrCreate

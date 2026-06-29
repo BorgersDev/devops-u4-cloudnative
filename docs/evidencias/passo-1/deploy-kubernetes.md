@@ -16,6 +16,8 @@ deployment "data-service" successfully rolled out
 deployment "gateway-service" successfully rolled out
 ```
 
+![kubectl set image + rollout status com a tag por SHA curto](images/04-rollout-status-imagens-sha.webp)
+
 ## kubectl get pods -n cloudnative
 ```text
 NAME                              READY   STATUS    RESTARTS   AGE   IP              NODE       NOMINATED NODE   READINESS GATES
@@ -29,6 +31,8 @@ NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
 data-service      ClusterIP   10.96.172.109   <none>        8000/TCP   10m
 gateway-service   ClusterIP   10.106.144.58   <none>        8000/TCP   10m
 ```
+
+![Pods Running/Ready e Services ClusterIP no namespace cloudnative](images/03-kubernetes-pods-services-cloudnative.webp)
 
 ## Imagem implantada (tag por SHA curto)
 ```text
@@ -59,3 +63,5 @@ Gateway chama o data-service via DNS interno e retorna `degraded:false` com dado
   upstream: string[59]
 }
 ```
+
+![Gateway no cluster chamando o data-service (degraded:false)](images/05-gateway-chamando-data-service.webp)

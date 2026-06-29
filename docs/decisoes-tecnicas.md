@@ -125,7 +125,82 @@ Passo 3 (buffer local). O timeout e configuravel por `DATA_SERVICE_TIMEOUT_SECON
   (`http_requests_total`, `http_request_duration_seconds`, `process_cpu_seconds_total`).
 - Jaeger com trace multi-servico (`gateway-service GET /` -> `data-service GET /data`).
 
-## Passo 3 (planejado)
-Namespace `edge`, `NetworkPolicy` com CNI que aplica policy, simulacao de
-latencia separada da desconexao, probes tolerantes, buffer local, observabilidade
-offline e `scripts/sync.py` idempotente.
+## Passo 3: Simulacao de Edge Computing
+
+### Mesma imagem, comportamento por ambiente
+O gateway de borda usa a **mesma imagem** do gateway central; o modo borda e ligado
+por variaveis de ambiente, nao por um novo build:
+- `EDGE_BUFFER_PATH` (vazio no central) ativa a gravacao no buffer local quando o
+  gateway cai em modo degradado. Sem a variavel, o comportamento dos Passos 1 e 2
+  fica intacto.
+- `OTEL_SDK_DISABLED=true` desliga o tracing na borda, onde nao ha sidecar
+  `otel-collector` nem Jaeger alcancavel. Sem isso, o exportador OTLP tentaria
+  `localhost:4317` e geraria erros. O guard fica no `setup_tracing` do gateway.
+
+### Buffer local e contrato de evento
+No modo degradado (timeout, conexao bloqueada por `NetworkPolicy` ou erro do
+central), o gateway gera **um `event_id` (uuid) por requisicao** e grava um evento
+`{event_id, timestamp, path, payload}` em JSONL no buffer. O `event_id` e o que
+viabiliza a deduplicacao idempotente no `POST /sync` (mesmo contrato do Passo 1). O
+`payload` carrega apenas dados da requisicao (reason, method, query), nunca dados
+pessoais (privacidade).
+
+### Volume do buffer: hostPath
+Preferimos **`hostPath`** (`/mnt/edge-buffer`, `DirectoryOrCreate`) a `emptyDir`
+porque sobrevive a recriacao do pod, demonstrando melhor a resiliencia (o PRD nota
+que `emptyDir` perde dados quando o pod e removido). No Minikube aponta para o
+filesystem da VM/container do Minikube; inspecionavel com `minikube ssh`. Para uma
+demo efemera, `emptyDir` serve.
+
+### NetworkPolicy: bloqueio realista da desconexao
+`k8s/edge/networkpolicy.yaml` (`edge-offline`) e uma policy de **egress allow-list**
+sobre o pod `gateway-edge`: libera apenas DNS (kube-system:53) e o proprio namespace
+`edge` (Pushgateway local), deixando o namespace `cloudnative` **sem rota**. Assim a
+chamada ao central estoura o timeout e cai em modo degradado, em vez de falhar no
+DNS. Aplicada por `scripts/simulate-offline.sh` e removida por
+`scripts/restore-connection.sh`. **Requer CNI que aplica policy** (Calico/K3s); o CNI
+padrao do Minikube aceitaria a policy sem bloquear nada, invalidando a simulacao.
+
+### Latencia separada da desconexao
+Sao dois cenarios distintos e ambos bufferizam, com `reason` diferente:
+- **Latencia**: produtor lento (`RESPONSE_DELAY_MS` no central) acima do
+  `DATA_SERVICE_TIMEOUT_SECONDS=1.0` do gateway de borda -> `reason: timeout`.
+- **Desconexao**: `NetworkPolicy` bloqueando o central -> `reason: conexao
+  bloqueada/recusada`.
+
+### Probes tolerantes (justificativa dos valores)
+- **liveness** (`/health/live`, `periodSeconds: 15`, `failureThreshold: 6`): so
+  verifica o processo local, **nao depende do central**. Tolera ~90s de instabilidade
+  antes de reiniciar, evitando restart desnecessario em quedas curtas.
+- **readiness** (`/health/ready`, `periodSeconds: 10`, `failureThreshold: 3`):
+  retorna pronto **mesmo em modo degradado**, pois o gateway atende localmente e
+  bufferiza. O pod permanece `Ready` durante o offline, refletindo autonomia local.
+  Readiness de borda nao deve depender exclusivamente do central.
+
+### Observabilidade offline: Pushgateway local
+`k8s/edge/pushgateway.yaml` roda **dentro do namespace `edge`**, entao continua
+acessivel mesmo com a `NetworkPolicy` bloqueando a saida ao central. O gateway envia
+o acumulado de eventos bufferizados como Gauge `edge_buffered_events_total`. Limitacao
+consciente: o Pushgateway **apenas retem o ultimo valor por job** ate ser raspado por
+um Prometheus apos a reconexao, nao mantem historico. Falha de push e tolerada; o
+**log local** do container e a evidencia minima offline (alternativa mais simples, no
+espirito do PRD).
+
+### Sincronizacao idempotente (`scripts/sync.py`)
+Le o buffer JSONL, envia em lote ao `POST /sync` e, **so apos sucesso**, remove do
+buffer os eventos reconhecidos (`accepted` + `ignored`). Usa apenas `urllib` (stdlib)
+para rodar no host sem dependencias. Reexecucoes nao duplicam: o central deduplica por
+`event_id`, entao um reenvio cai todo em `ignored`. Comprovado em
+`docs/evidencias/passo-3/validacao-local.md`.
+
+### Validacoes executadas no Passo 3
+- Buffer gravado nos dois cenarios (offline e latencia), com `event_id` por
+  requisicao e contrato `{event_id, timestamp, path, payload}`.
+- `sync.py` enviando ao central, removendo do buffer e sendo idempotente em
+  reexecucao (segundo envio inteiro em `ignored`, `total_known` estavel).
+- Comprovado no cluster (Minikube + Calico): `NetworkPolicy` bloqueando o central
+  (chamada direta da borda da timeout), modo degradado, buffer no `hostPath`, probes
+  mantendo o pod `Ready` sem restart, Pushgateway retendo `edge_buffered_events_total`
+  e sync idempotente. Evidencia em `docs/evidencias/passo-3/validacao-cluster.md`;
+  buffer/sync/idempotencia tambem em `validacao-local.md` e o passo a passo em
+  `reproduzir-no-cluster.md`.

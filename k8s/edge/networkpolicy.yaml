@@ -1,0 +1,46 @@
+# NetworkPolicy que simula a QUEDA DE CONECTIVIDADE da borda com o central (Passo 3,
+# US-010 / FR-20). Aplicada por scripts/simulate-offline.sh e removida por
+# scripts/restore-connection.sh.
+#
+# NetworkPolicy de egress e allow-list: ao declarar regras de egress, TODO o trafego
+# de saida do pod selecionado passa a ser bloqueado, exceto o que estiver listado.
+# Liberamos apenas:
+#   - DNS (kube-system:53) para que a resolucao de nomes ainda funcione e a falha
+#     seja de ROTA ate o central (timeout), e nao um erro de DNS;
+#   - trafego dentro do proprio namespace `edge` (ex.: Pushgateway local).
+# Como o namespace `cloudnative` NAO esta liberado, a chamada do gateway de borda ao
+# data-service central fica sem rota e estoura o DATA_SERVICE_TIMEOUT_SECONDS,
+# levando o gateway ao modo degradado e gravando o evento no buffer local.
+#
+# Pre-requisito: CNI que APLICA NetworkPolicy (Calico no Minikube ou K3s). O CNI
+# padrao do Minikube aceita o objeto mas nao o aplica, o que invalidaria a simulacao.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge-offline
+  namespace: edge
+  labels:
+    part-of: devops-u4-cloudnative
+    component: edge
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway-edge
+  policyTypes:
+    - Egress
+  egress:
+    # Libera DNS (UDP/TCP 53) para o kube-dns no kube-system.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Libera trafego dentro do proprio namespace edge (Pushgateway local).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: edge
